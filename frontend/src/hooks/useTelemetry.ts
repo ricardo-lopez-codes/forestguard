@@ -11,9 +11,11 @@ export function useTelemetry() {
   
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
+  const heartbeatIntervalRef = useRef<number | null>(null);
   const isUnmountedRef = useRef(false);
+  const isWsConnectedRef = useRef(false);
 
-  const fallbackPoll = useCallback(async () => {
+  const pollLatest = useCallback(async () => {
     try {
       const data = await fetchCurrentTelemetry();
       if (data.reading && !isUnmountedRef.current) {
@@ -21,7 +23,7 @@ export function useTelemetry() {
         setLastUpdated(new Date());
       }
     } catch {
-      // Ignore polling errors while reconnecting
+      // Ignore background poll errors
     }
   }, []);
 
@@ -29,7 +31,9 @@ export function useTelemetry() {
     if (isUnmountedRef.current) return;
 
     if (wsRef.current) {
-      wsRef.current.close();
+      try {
+        wsRef.current.close();
+      } catch {}
       wsRef.current = null;
     }
 
@@ -44,7 +48,18 @@ export function useTelemetry() {
 
       ws.onopen = () => {
         if (isUnmountedRef.current) return;
+        isWsConnectedRef.current = true;
         setConnectionStatus('connected');
+
+        // Start 10s ping heartbeat to keep cloud reverse proxies (Render / Cloudflare) alive
+        if (heartbeatIntervalRef.current) window.clearInterval(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = window.setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            try {
+              ws.send('ping');
+            } catch {}
+          }
+        }, 10000);
       };
 
       ws.onmessage = (event) => {
@@ -55,49 +70,60 @@ export function useTelemetry() {
             setReading(packet.data);
             setLastUpdated(new Date());
           }
-        } catch (e) {
-          console.warn('Error parsing telemetry frame:', e);
+        } catch {
+          // Ignore parse errors (e.g. pong replies)
         }
       };
 
       ws.onerror = () => {
-        // Handled by onclose
+        // Will trigger onclose
       };
 
       ws.onclose = () => {
         if (isUnmountedRef.current) return;
+        isWsConnectedRef.current = false;
         setConnectionStatus('disconnected');
         wsRef.current = null;
 
-        // Schedule reconnect in 3 seconds
+        if (heartbeatIntervalRef.current) {
+          window.clearInterval(heartbeatIntervalRef.current);
+          heartbeatIntervalRef.current = null;
+        }
+
+        // Auto-reconnect after 2 seconds
         if (reconnectTimeoutRef.current) {
           window.clearTimeout(reconnectTimeoutRef.current);
         }
         reconnectTimeoutRef.current = window.setTimeout(() => {
           connectWs();
-        }, 3000);
+        }, 2000);
       };
     } catch {
+      isWsConnectedRef.current = false;
       setConnectionStatus('disconnected');
     }
   }, []);
 
   useEffect(() => {
     isUnmountedRef.current = false;
+    
     // Initial fetch to populate immediately
-    fallbackPoll();
+    pollLatest();
     connectWs();
 
-    // Fallback polling every 4s in case WS is dropped
+    // Secondary fallback poller in case WebSocket has any transient cloud delay
     const pollInterval = window.setInterval(() => {
-      if (connectionStatus !== 'connected') {
-        fallbackPoll();
+      if (!isWsConnectedRef.current) {
+        pollLatest();
       }
-    }, 4000);
+    }, 2000);
 
     return () => {
       isUnmountedRef.current = true;
       window.clearInterval(pollInterval);
+      if (heartbeatIntervalRef.current) {
+        window.clearInterval(heartbeatIntervalRef.current);
+      }
       if (reconnectTimeoutRef.current) {
         window.clearTimeout(reconnectTimeoutRef.current);
       }
@@ -105,12 +131,12 @@ export function useTelemetry() {
         wsRef.current.close();
       }
     };
-  }, [connectWs, fallbackPoll, connectionStatus]);
+  }, [connectWs, pollLatest]); // DO NOT put connectionStatus here to avoid cyclic re-close!
 
   return {
     reading,
     connectionStatus,
     lastUpdated,
-    refreshNow: fallbackPoll
+    refreshNow: pollLatest
   };
 }
