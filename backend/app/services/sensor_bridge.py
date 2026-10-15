@@ -31,6 +31,7 @@ class SensorBridge:
         self.demo_scenario: str = "normal"
         self.last_reading: Optional[Dict[str, Any]] = None
         self.last_read_timestamp: Optional[datetime] = None
+        self.last_remote_push_time: Optional[datetime] = None
 
         # Demo generator internal state
         self._demo_tick: int = 0
@@ -215,6 +216,13 @@ class SensorBridge:
             try:
                 settings = db.query(SystemSettings).first()
                 if not settings:
+                    await asyncio.sleep(1.0)
+                    continue
+
+                # If remote hardware is actively streaming via /api/telemetry/push, yield to live stream
+                if self.last_remote_push_time and (datetime.now(timezone.utc) - self.last_remote_push_time).total_seconds() < 10.0:
+                    self.current_mode = "live"
+                    self.is_connected = True
                     await asyncio.sleep(1.0)
                     continue
 

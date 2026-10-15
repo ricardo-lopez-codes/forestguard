@@ -141,6 +141,10 @@ async def push_remote_telemetry(payload: PushTelemetryRequest, db: Session = Dep
     sensor_bridge.current_mode = "live"
     sensor_bridge.is_connected = True
     sensor_bridge.last_read_timestamp = now_utc
+    sensor_bridge.last_remote_push_time = now_utc
+    if settings and settings.demo_mode:
+        settings.demo_mode = False
+        db.commit()
 
     await sensor_bridge._notify_listeners({
         "type": "telemetry",
