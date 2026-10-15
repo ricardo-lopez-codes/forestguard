@@ -55,30 +55,45 @@ def main():
     print(f"Connecting to Arduino Nano on {target_port} at {args.baud} baud...")
     try:
         ser = serial.Serial(target_port, args.baud, timeout=1.0)
+        # Flush any stale power-on noise from buffer
+        ser.reset_input_buffer()
     except Exception as e:
         print(f"Failed to open {target_port}: {e}")
         return
 
     print(f"Streaming telemetry from {target_port} -> {api_url}")
-    print("Press Ctrl+C to stop.")
+    print("Press Ctrl+C to stop.\n")
+
+    session = requests.Session()
 
     while True:
         try:
+            # Drain any buffered backlog to guarantee we read the latest real-time frame
             line = ser.readline().decode("utf-8", errors="ignore")
+            while ser.in_waiting > 0:
+                fresh_line = ser.readline().decode("utf-8", errors="ignore")
+                if fresh_line.strip().startswith("{") and fresh_line.strip().endswith("}"):
+                    line = fresh_line
+
             packet = parse_line(line)
             if packet:
-                res = requests.post(api_url, json=packet, timeout=3.0)
+                res = session.post(api_url, json=packet, timeout=3.5)
                 if res.status_code == 200:
                     temp_display = f"{packet['temperature_c']:.1f}°C" if packet['temperature_c'] is not None else "FAULT"
                     print(f"[{time.strftime('%X')}] Forwarded: Temp={temp_display}, MQ-2={packet['mq2_raw']} -> Render OK")
                 else:
-                    print(f"Render server returned HTTP {res.status_code}")
+                    print(f"[{time.strftime('%X')}] Render HTTP error: {res.status_code}")
         except KeyboardInterrupt:
             print("\nStopped.")
             break
         except Exception as e:
-            print(f"Streaming glitch: {e}")
-            time.sleep(1.0)
+            print(f"[{time.strftime('%X')}] Network glitch: {e}")
+            # Flush serial buffer after network delays to prevent lag buildup
+            try:
+                ser.reset_input_buffer()
+            except Exception:
+                pass
+            time.sleep(0.5)
 
     ser.close()
 
