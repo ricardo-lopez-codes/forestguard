@@ -1,7 +1,8 @@
-import React from 'react';
-import { Settings, RefreshCw, Cpu, Activity } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Settings, RefreshCw, Cpu, Activity, Bell } from 'lucide-react';
 import type { TelemetryReading } from '../types';
 import type { WsConnectionStatus } from '../hooks/useTelemetry';
+import { requestNotificationPermission, triggerBrowserAlert } from '../services/browserNotifications';
 
 interface HeaderProps {
   reading: TelemetryReading | null;
@@ -21,6 +22,40 @@ export const Header: React.FC<HeaderProps> = ({
   onQuickScenarioChange
 }) => {
   const isDemo = reading?.mode === 'demo';
+  const [notificationPermission, setNotificationPermission] = useState<string>(
+    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
+  );
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setNotificationPermission(Notification.permission);
+    }
+  }, []);
+
+  const handleEnableNotifications = async () => {
+    const res = await requestNotificationPermission();
+    if (res) {
+      setNotificationPermission(res);
+      if (res === 'granted') {
+        triggerBrowserAlert(
+          '🔔 ForestGuard Alerts Enabled',
+          'Desktop notifications are now active. You will receive system warnings when fire threats are detected.'
+        );
+      }
+    }
+  };
+
+  const handleScenarioSelect = (scenario: string) => {
+    // If user picks the fire alert scenario, ensure notification permission is requested!
+    if (scenario === 'fire_alert' && notificationPermission === 'default') {
+      requestNotificationPermission().then((res) => {
+        if (res) setNotificationPermission(res);
+      });
+    }
+    if (onQuickScenarioChange) {
+      onQuickScenarioChange(scenario);
+    }
+  };
 
   // Format relative timestamp
   const getRelativeTime = () => {
@@ -88,31 +123,65 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Telemetry Status and Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          {/* Quick Scenario Picker (shown in demo mode for instant testing) */}
-          {isDemo && onQuickScenarioChange && (
+        {/* Telemetry Status and Controls (Menu on the Right) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          
+          {/* Scenario Selector on the Right */}
+          {onQuickScenarioChange && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Scenario:</span>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                Demo Scenario:
+              </span>
               <select
                 style={{
                   fontSize: '11px',
-                  padding: '3px 6px',
+                  fontWeight: 500,
+                  padding: '4px 8px',
                   border: '1px solid var(--border-strong)',
                   borderRadius: 'var(--radius)',
-                  backgroundColor: 'var(--bg-surface)'
+                  backgroundColor: 'var(--bg-surface)',
+                  color: 'var(--text-primary)',
+                  cursor: 'pointer'
                 }}
-                onChange={(e) => onQuickScenarioChange(e.target.value)}
-                defaultValue="normal"
+                onChange={(e) => handleScenarioSelect(e.target.value)}
+                defaultValue={isDemo ? 'normal' : 'live'}
               >
-                <option value="normal">Normal (Clear)</option>
-                <option value="smoke_spike">Watch: High Smoke Only</option>
-                <option value="temp_spike">Watch: High Temp Only</option>
-                <option value="fire_alert">Fire Alert: Smoke &amp; Temp</option>
-                <option value="sensor_error">Sensor Error: Temp Fail</option>
-                <option value="recovering">Cooling / Recovery</option>
+                {!isDemo && <option value="live">● Live Arduino Hardware (Streaming)</option>}
+                <option value="fire_alert">🔥 Forest Fire Emergency (Demo)</option>
+                <option value="smoke_spike">⚠️ Watch: High Smoke Only (Demo)</option>
+                <option value="temp_spike">⚠️ Watch: High Temp Only (Demo)</option>
+                <option value="normal">✅ Normal Baseline (Demo)</option>
+                <option value="sensor_error">❌ Sensor Error: Probe Fail (Demo)</option>
+                <option value="recovering">🔄 Cooling / Recovery (Demo)</option>
               </select>
             </div>
+          )}
+
+          {/* Browser Desktop Notifications Button */}
+          {notificationPermission !== 'granted' ? (
+            <button
+              className="btn btn-sm"
+              onClick={handleEnableNotifications}
+              style={{
+                fontSize: '11px',
+                padding: '3px 8px',
+                backgroundColor: 'var(--status-watch-bg)',
+                color: 'var(--status-watch-text)',
+                borderColor: 'var(--status-watch-border)'
+              }}
+              title="Click to allow desktop browser alerts for forest fire warnings"
+            >
+              <Bell size={11} />
+              <span>Enable Browser Alerts</span>
+            </button>
+          ) : (
+            <span
+              className="badge badge-normal"
+              style={{ fontSize: '10px', padding: '3px 6px', cursor: 'default' }}
+              title="Desktop browser alerts are active"
+            >
+              <Bell size={10} /> Alerts Active
+            </span>
           )}
 
           {/* Connection Indicator */}

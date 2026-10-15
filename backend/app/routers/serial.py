@@ -1,6 +1,9 @@
 from typing import Optional
-from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy.orm import Session
+from app.database import get_db
+from app.models.settings import SystemSettings
 from app.services.sensor_bridge import sensor_bridge
 
 router = APIRouter(prefix="/api/serial", tags=["serial"])
@@ -42,10 +45,18 @@ def disconnect_serial_port():
     return {"success": True, "message": "Serial connection closed"}
 
 @router.post("/mode")
-def set_bridge_mode(payload: SwitchModeRequest):
+def set_bridge_mode(payload: SwitchModeRequest, db: Session = Depends(get_db)):
     if payload.mode not in ["live", "demo"]:
         raise HTTPException(status_code=400, detail="Mode must be 'live' or 'demo'")
     sensor_bridge.set_mode(payload.mode, payload.scenario)
+
+    settings = db.query(SystemSettings).first()
+    if settings:
+        settings.demo_mode = (payload.mode == "demo")
+        if payload.scenario:
+            settings.demo_scenario = payload.scenario
+        db.commit()
+
     return {
         "mode": sensor_bridge.current_mode,
         "scenario": sensor_bridge.demo_scenario,

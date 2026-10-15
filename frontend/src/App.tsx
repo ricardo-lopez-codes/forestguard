@@ -8,6 +8,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { useTelemetry } from './hooks/useTelemetry';
 import { fetchSettings, setBridgeMode } from './services/api';
 import type { SystemSettings } from './types';
+import { triggerBrowserAlert } from './services/browserNotifications';
 
 export const App: React.FC = () => {
   const { reading, connectionStatus, lastUpdated, refreshNow } = useTelemetry();
@@ -26,6 +27,16 @@ export const App: React.FC = () => {
   useEffect(() => {
     loadSettings();
   }, []);
+
+  // Trigger browser notification and sound chime when POTENTIAL FIRE ALERT occurs
+  useEffect(() => {
+    if (reading?.status === 'POTENTIAL FIRE ALERT') {
+      triggerBrowserAlert(
+        '🔥 CRITICAL: Forest Fire Threat Detected!',
+        `Temperature: ${reading.temperature_c?.toFixed(1) ?? 'N/A'}°C | Smoke: ${reading.mq2_raw} ADC. Dual-condition verification confirmed fire emergency!`
+      );
+    }
+  }, [reading?.status, reading?.temperature_c, reading?.mq2_raw]);
 
   const handleQuickScenarioChange = async (scenario: string) => {
     try {

@@ -71,6 +71,9 @@ class SensorBridge:
             self.current_mode = mode
         if scenario:
             self.demo_scenario = scenario
+            self._demo_tick = 0  # Reset tick so simulation escalation plays from the start
+        if mode == "demo":
+            self.last_remote_push_time = None
         logger.info(f"SensorBridge mode set to {self.current_mode} (scenario: {self.demo_scenario})")
 
     def parse_serial_line(self, line: str) -> Optional[Dict[str, Any]]:
@@ -175,10 +178,10 @@ class SensorBridge:
             temp_valid = True
 
         elif self.demo_scenario == "fire_alert":
-            # Both high temp and high smoke
-            progress = min(1.0, t / 8.0)
-            temp_c = round(25.0 + progress * (58.5 - 25.0) + random.uniform(-0.2, 0.2), 1)
-            mq2_raw = int(160 + progress * (680 - 160) + random.randint(-8, 8))
+            # Both high temp and high smoke - realistic forest fire escalation
+            progress = min(1.0, t / 6.0)
+            temp_c = round(25.0 + progress * (63.5 - 25.0) + random.uniform(-0.3, 0.3), 1)
+            mq2_raw = int(160 + progress * (730 - 160) + random.randint(-12, 12))
             temp_valid = True
 
         elif self.demo_scenario == "sensor_error":
