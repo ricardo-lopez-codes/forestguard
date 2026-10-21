@@ -33,9 +33,9 @@ DallasTemperature sensors(&oneWire);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 bool lcdAvailable = false;
 
-// Default local thresholds for LCD display feedback
-const float LOCAL_TEMP_THRESHOLD = 50.0;
-const int LOCAL_MQ2_THRESHOLD = 400;
+// Dynamic local thresholds for LCD display feedback (customizable via serial from cloud/host)
+float localTempThreshold = 50.0;
+int localMq2Threshold = 400;
 
 void setup() {
   // Initialize USB Serial communication at 115200 baud
@@ -82,6 +82,31 @@ void setup() {
 }
 
 void loop() {
+  // Check for incoming threshold sync commands from host/bridge (e.g. "TH,28.5,250")
+  if (Serial.available()) {
+    String cmd = Serial.readStringUntil('\n');
+    cmd.trim();
+    if (cmd.startsWith("TH,")) {
+      int firstComma = cmd.indexOf(',');
+      int secondComma = cmd.indexOf(',', firstComma + 1);
+      if (secondComma > firstComma) {
+        float newTemp = cmd.substring(firstComma + 1, secondComma).toFloat();
+        int newMq2 = cmd.substring(secondComma + 1).toInt();
+        if (newTemp >= -40.0 && newTemp <= 125.0) {
+          localTempThreshold = newTemp;
+        }
+        if (newMq2 >= 0 && newMq2 <= 1023) {
+          localMq2Threshold = newMq2;
+        }
+        Serial.print(F("{\"system\":\"ACK_THRESHOLDS\",\"temp_th\":"));
+        Serial.print(localTempThreshold, 1);
+        Serial.print(F(",\"mq2_th\":"));
+        Serial.print(localMq2Threshold);
+        Serial.println(F("}"));
+      }
+    }
+  }
+
   unsigned long currentMillis = millis();
 
   if (currentMillis - lastSampleTime >= SAMPLING_INTERVAL) {
@@ -139,8 +164,8 @@ void loop() {
 
       // Line 2: Status overview
       lcd.setCursor(0, 1);
-      bool smokeHigh = (mq2Raw >= LOCAL_MQ2_THRESHOLD);
-      bool tempHigh = (tempValid && tempC >= LOCAL_TEMP_THRESHOLD);
+      bool smokeHigh = (mq2Raw >= localMq2Threshold);
+      bool tempHigh = (tempValid && tempC >= localTempThreshold);
 
       if (!tempValid) {
         lcd.print(F("STAT: SENSOR ERR"));

@@ -137,6 +137,8 @@ async def push_remote_telemetry(payload: PushTelemetryRequest, db: Session = Dep
     packet["trigger_summary"] = eval_result.trigger_summary
     packet["is_connected"] = True
     packet["serial_port"] = payload.serial_port
+    packet["threshold_temp"] = settings.threshold_temp if settings else 50.0
+    packet["threshold_mq2"] = settings.threshold_mq2 if settings else 400
     sensor_bridge.last_reading = packet
     sensor_bridge.current_mode = "live"
     sensor_bridge.is_connected = True
@@ -151,5 +153,10 @@ async def push_remote_telemetry(payload: PushTelemetryRequest, db: Session = Dep
         "data": packet
     })
 
-    return {"success": True, "reading": packet}
+    return {
+        "success": True, 
+        "reading": packet,
+        "threshold_temp": settings.threshold_temp if settings else 50.0,
+        "threshold_mq2": settings.threshold_mq2 if settings else 400
+    }
 

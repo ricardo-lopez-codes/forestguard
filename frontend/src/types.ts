@@ -19,6 +19,8 @@ export interface TelemetryReading {
   trigger_summary?: string;
   is_connected?: boolean;
   serial_port?: string;
+  threshold_temp?: number;
+  threshold_mq2?: number;
 }
 
 export interface SystemSettings {

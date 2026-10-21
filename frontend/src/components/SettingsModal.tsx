@@ -102,9 +102,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       });
       onSettingsUpdated();
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to save settings:', err);
-      alert('Failed to save settings. Check console.');
+      alert(`Failed to save settings: ${err?.message || 'Check connection or values.'}`);
     } finally {
       setSaving(false);
     }
@@ -227,25 +227,65 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {activeTab === 'thresholds' && (
             <div>
               <div className="form-group">
-                <label className="form-label">
-                  Temperature Warning Threshold (°C)
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label className="form-label">
+                    Temperature Warning Threshold (°C)
+                  </label>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    {[
+                      { label: 'Room (28°C)', val: 28.0 },
+                      { label: 'Watch (35°C)', val: 35.0 },
+                      { label: 'Standard (50°C)', val: 50.0 },
+                    ].map((p) => (
+                      <button
+                        key={p.val}
+                        type="button"
+                        className="btn btn-sm"
+                        style={{ fontSize: '10px', padding: '1px 6px' }}
+                        onClick={() => setTempThreshold(p.val)}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <input
                   type="number"
                   step="0.5"
+                  min="-40"
+                  max="125"
                   className="form-input mono"
                   value={tempThreshold}
                   onChange={(e) => setTempThreshold(parseFloat(e.target.value) || 0)}
                 />
                 <div className="form-hint">
-                  Default: 50.0°C. Temperature readings at or above this trigger the high-temperature condition.
+                  Range: -40.0°C to 125.0°C. Temperature readings at or above this trigger the high-temperature condition.
                 </div>
               </div>
 
               <div className="form-group">
-                <label className="form-label">
-                  Smoke / Gas Threshold (Raw MQ-2 ADC 0–1023)
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label className="form-label">
+                    Smoke / Gas Threshold (Raw MQ-2 ADC 0–1023)
+                  </label>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    {[
+                      { label: 'Sensitive (220)', val: 220 },
+                      { label: 'Standard (400)', val: 400 },
+                      { label: 'Heavy (600)', val: 600 },
+                    ].map((p) => (
+                      <button
+                        key={p.val}
+                        type="button"
+                        className="btn btn-sm"
+                        style={{ fontSize: '10px', padding: '1px 6px' }}
+                        onClick={() => setMq2Threshold(p.val)}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <input
                   type="number"
                   step="10"
@@ -256,7 +296,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onChange={(e) => setMq2Threshold(parseInt(e.target.value) || 0)}
                 />
                 <div className="form-hint">
-                  Default: 400. Raw analog conversion steps. Baseline ambient is typically ~120–200.
+                  Range: 0 to 1023 ADC steps. Baseline ambient is typically ~120–200.
                 </div>
               </div>
 

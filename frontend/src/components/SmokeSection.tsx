@@ -5,11 +5,13 @@ import type { TelemetryReading } from '../types';
 interface SmokeSectionProps {
   reading: TelemetryReading | null;
   smokeThreshold: number;
+  onUpdateThreshold?: (val: number) => void;
 }
 
 export const SmokeSection: React.FC<SmokeSectionProps> = ({
   reading,
-  smokeThreshold
+  smokeThreshold,
+  onUpdateThreshold
 }) => {
   const currentRaw = reading?.mq2_raw ?? 0;
   const smokeDetected = reading?.smoke_detected ?? false;
@@ -92,8 +94,28 @@ export const SmokeSection: React.FC<SmokeSectionProps> = ({
             }}>
               {currentRaw}
             </span>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--text-muted)' }}>
               threshold: <strong className="mono">{smokeThreshold}</strong>
+              {onUpdateThreshold && (
+                <span style={{ display: 'inline-flex', gap: '2px', marginLeft: '2px' }}>
+                  <button
+                    className="btn btn-sm"
+                    style={{ fontSize: '10px', padding: '0 4px', height: '18px', minWidth: '18px', lineHeight: '18px' }}
+                    onClick={() => onUpdateThreshold(smokeThreshold - 25)}
+                    title="Lower smoke threshold by 25 ADC"
+                  >
+                    -
+                  </button>
+                  <button
+                    className="btn btn-sm"
+                    style={{ fontSize: '10px', padding: '0 4px', height: '18px', minWidth: '18px', lineHeight: '18px' }}
+                    onClick={() => onUpdateThreshold(smokeThreshold + 25)}
+                    title="Raise smoke threshold by 25 ADC"
+                  >
+                    +
+                  </button>
+                </span>
+              )}
             </span>
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>

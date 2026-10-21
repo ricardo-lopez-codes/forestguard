@@ -65,6 +65,8 @@ def main():
     print("Press Ctrl+C to stop.\n")
 
     session = requests.Session()
+    last_synced_temp = None
+    last_synced_mq2 = None
 
     while True:
         try:
@@ -79,6 +81,19 @@ def main():
             if packet:
                 res = session.post(api_url, json=packet, timeout=3.5)
                 if res.status_code == 200:
+                    res_json = res.json()
+                    th_temp = res_json.get("threshold_temp")
+                    th_mq2 = res_json.get("threshold_mq2")
+                    if th_temp is not None and th_mq2 is not None:
+                        if th_temp != last_synced_temp or th_mq2 != last_synced_mq2:
+                            try:
+                                ser.write(f"TH,{th_temp:.1f},{int(th_mq2)}\n".encode("utf-8"))
+                                last_synced_temp = th_temp
+                                last_synced_mq2 = th_mq2
+                                print(f"[{time.strftime('%X')}] Synced custom thresholds to Arduino: Temp={th_temp:.1f}°C, MQ-2={th_mq2}")
+                            except Exception as sync_err:
+                                print(f"[{time.strftime('%X')}] Arduino threshold sync error: {sync_err}")
+
                     temp_display = f"{packet['temperature_c']:.1f}°C" if packet['temperature_c'] is not None else "FAULT"
                     print(f"[{time.strftime('%X')}] Forwarded: Temp={temp_display}, MQ-2={packet['mq2_raw']} -> Render OK")
                 else:

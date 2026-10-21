@@ -15,11 +15,13 @@ import { fetchTelemetryHistory } from '../services/api';
 interface TemperatureSectionProps {
   reading: TelemetryReading | null;
   tempThreshold: number;
+  onUpdateThreshold?: (val: number) => void;
 }
 
 export const TemperatureSection: React.FC<TemperatureSectionProps> = ({
   reading,
-  tempThreshold
+  tempThreshold,
+  onUpdateThreshold
 }) => {
   const [range, setRange] = useState<'15m' | '1h' | '6h' | '24h'>('1h');
   const [history, setHistory] = useState<HistoryResponse | null>(null);
@@ -119,8 +121,28 @@ export const TemperatureSection: React.FC<TemperatureSectionProps> = ({
                 SENSOR FAULT
               </span>
             )}
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--text-muted)' }}>
               threshold: <strong className="mono">{tempThreshold.toFixed(1)}°C</strong>
+              {onUpdateThreshold && (
+                <span style={{ display: 'inline-flex', gap: '2px', marginLeft: '2px' }}>
+                  <button
+                    className="btn btn-sm"
+                    style={{ fontSize: '10px', padding: '0 4px', height: '18px', minWidth: '18px', lineHeight: '18px' }}
+                    onClick={() => onUpdateThreshold(tempThreshold - 1)}
+                    title="Lower temperature threshold by 1°C"
+                  >
+                    -
+                  </button>
+                  <button
+                    className="btn btn-sm"
+                    style={{ fontSize: '10px', padding: '0 4px', height: '18px', minWidth: '18px', lineHeight: '18px' }}
+                    onClick={() => onUpdateThreshold(tempThreshold + 1)}
+                    title="Raise temperature threshold by 1°C"
+                  >
+                    +
+                  </button>
+                </span>
+              )}
             </span>
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>

@@ -45,7 +45,22 @@ export async function updateSettings(settings: Partial<SystemSettings>): Promise
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(settings)
   });
-  if (!res.ok) throw new Error(`Failed to update system settings: ${res.statusText}`);
+  if (!res.ok) {
+    let errMsg = `HTTP ${res.status}: ${res.statusText}`;
+    try {
+      const errJson = await res.json();
+      if (errJson && errJson.detail) {
+        if (typeof errJson.detail === 'string') {
+          errMsg = errJson.detail;
+        } else if (Array.isArray(errJson.detail)) {
+          errMsg = errJson.detail.map((e: any) => `${e.loc?.filter((x: string) => x !== 'body')?.join('.') || 'field'}: ${e.msg}`).join(', ');
+        } else {
+          errMsg = JSON.stringify(errJson.detail);
+        }
+      }
+    } catch {}
+    throw new Error(errMsg);
+  }
   return res.json();
 }
 

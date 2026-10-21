@@ -297,6 +297,8 @@ class SensorBridge:
                     packet_dict["trigger_summary"] = eval_result.trigger_summary
                     packet_dict["is_connected"] = self.is_connected
                     packet_dict["serial_port"] = self.serial_port_name if self.current_mode == "live" else "SIMULATED"
+                    packet_dict["threshold_temp"] = settings.threshold_temp
+                    packet_dict["threshold_mq2"] = settings.threshold_mq2
                     self.last_reading = packet_dict
 
                     # Broadcast to active WebSockets
